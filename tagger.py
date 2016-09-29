@@ -13,21 +13,6 @@ from mysql import MysqlClient
 
 # Synonym sets
 
-synonyms_config = {
-        u'通勤': [
-            'AAAA',
-            'BBBB',
-            'CCCC',
-            'DDDD'
-        ],
-        u'A字裙': [
-            'EEEE',
-            'FFFF',
-            'GGGG',
-            'HHHH'
-        ]
-}
-
 def getStartTime():
     start_time = settings.cacheTime
     if os.path.exists(settings.cacheTimeFile):
@@ -42,7 +27,7 @@ def saveCacheTime(cacheTime):
     f.close()
     return None
 
-def process(id, desp, nodeAttributes):
+def process(id, desp, nodeAttributes, synonymsDic):
     tags = {}
     despDict = json.loads(desp)
 
@@ -56,7 +41,7 @@ def process(id, desp, nodeAttributes):
             continue
 
         for attr_v in attr['values']:
-            synonyms = synonyms_config.get(attr_v)
+            synonyms = synonymsDic.get(attr_v)
             if synonyms is None:
                 synonyms = [attr_v]
             else:
@@ -75,6 +60,7 @@ def main():
         print('MySQL connection error...')
         return None
 
+    ''' Node attributes '''
     nodeAttributes = {}
     query_rows = con.query('SELECT `cid`, `pid`, `typename` FROM `tb_category` WHERE `isattribute` = 1')
     for cate in con.fetchAll():
@@ -95,6 +81,9 @@ def main():
         sort_keys=True, 
         indent=4, 
         separators=(',', ': ')))
+
+    ''' synonyms '''
+    synonyms = {}
 
     last_time = getStartTime()
 
@@ -117,7 +106,7 @@ def main():
             print('[%s - %s]: query %s %s rows...' % (last_time, now_time, start, query_rows))
 
             for data in con.fetchAll():
-                tags = process(cid, data[3], nodeAttributes)
+                tags = process(cid, data[3], nodeAttributes, synonyms)
 
                 affected_rows = con.query('UPDATE `tb_goods_info` SET `attrs` = %s, `updatetime` = now() WHERE `srcid` = %s',
                     [json.dumps(tags, encoding='UTF-8', ensure_ascii=False), data[0]])
