@@ -19,9 +19,12 @@ DATABASES = {
     }
 }
 
-# Cache time
-cacheTime = '1970-01-01 00:00:00'
+# Start time
+startTime = '1970-01-01 00:00:00'
 
-# Cache time file
-cacheTimeFile = 'cache.time'
+# Start time file
+startTimeFile = 'start.time.cache'
+
+# Interval(s) for checking database
+interval = 60
 

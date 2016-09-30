@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import argparse
 import os
 import sys
 import string
@@ -14,24 +15,24 @@ from mysql import MysqlClient
 # Synonym sets
 
 def getStartTime():
-    start_time = settings.cacheTime
-    if os.path.exists(settings.cacheTimeFile):
-        f = open(settings.cacheTimeFile, 'r')
-        start_time = f.read().strip()
+    startTime = settings.startTime
+    if os.path.exists(settings.startTimeFile):
+        f = open(settings.startTimeFile, 'r')
+        startTime = f.read().strip()
         f.close()
-    return start_time
+    return startTime
 
-def saveCacheTime(cacheTime):
-    f = open(settings.cacheTimeFile, 'w')
-    f.write(cacheTime)
+def saveCacheTime(startTime):
+    f = open(settings.startTimeFile, 'w')
+    f.write(startTime)
     f.close()
     return None
 
-def process(id, desp, nodeAttributes, synonymsDic):
+def tag(id, desp, nodeAttributes, synonymsDic):
     tags = {}
     despDict = json.loads(desp)
 
-    attrs = nodeAttributes[id]
+    attrs = nodeAttributes[str(id)]
     for attr in attrs:
         attr_n = attr['name']
         tags[attr_n] = []
@@ -53,7 +54,7 @@ def process(id, desp, nodeAttributes, synonymsDic):
                     break
     return tags
 
-def main():
+def process(dataType):
     db = DATABASES['default']
     con = MysqlClient(db['HOST'], db['USER'], db['PASSWORD'], db['NAME'], db['PORT'])
     if not con.connect():
@@ -94,19 +95,19 @@ def main():
 
         start = 0
         step = 1000
-        cid = '2'
 
         while True:
             query_rows = con.query('SELECT `srcid`, `title`, `srclink`, `desp`, `createtime` '
                 'FROM `tb_goods_info` '
                 'WHERE `cid` = %s AND `createtime` >= %s AND `createtime` < %s '
                 'limit %s, %s',
-                [cid, last_time, now_time, start, step])
+                [dataType, last_time, now_time, start, step])
 
-            print('[%s - %s]: query %s %s rows...' % (last_time, now_time, start, query_rows))
+            print('[%s - %s]: query %s %s rows...' 
+                % (last_time, now_time, start, query_rows))
 
             for data in con.fetchAll():
-                tags = process(cid, data[3], nodeAttributes, synonyms)
+                tags = tag(dataType, data[3], nodeAttributes, synonyms)
 
                 affected_rows = con.query('UPDATE `tb_goods_info` SET `attrs` = %s, `updatetime` = now() WHERE `srcid` = %s',
                     [json.dumps(tags, encoding='UTF-8', ensure_ascii=False), data[0]])
@@ -117,13 +118,34 @@ def main():
 
             start += query_rows
             if query_rows <> step:
-                    break
+                break
 
         last_time = now_time
         saveCacheTime(last_time)
-        time.sleep(60)
+        time.sleep(settings.interval)
 
     return None
 
+def main():
+    parser = argparse.ArgumentParser("Bookish-Tagger")
+    parser.add_argument('-c', action='store', dest='dataType', required=True, type=int, help='Store the type of Taobao data')
+    parser.add_argument('-i', action='store', dest='interval', required=True, type=int, help='Store the interval value')
+    parser.add_argument('-t', action='store', dest='startTime', help='Store the processing starting time')
+    parser.add_argument('--verbose', action='store_true', dest='verboseMode', help='Verbose mode')
+    parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+    args = parser.parse_args()
+
+    if args.startTime:
+        settings.startTime = args.startTime
+    if args.interval:
+        settings.interval = args.interval
+    if args.verboseMode:
+        settings.DEBUG = True
+
+    if args.dataType:
+        process(args.dataType)
+    return None
+
 if __name__ == '__main__':
-	main()
+    main()
+
