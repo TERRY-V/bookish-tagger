@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import signal
 import sys
 import string
 import time
@@ -126,7 +127,21 @@ def process(dataType):
 
     return None
 
+def exit_gracefully(signum, frame):
+    try:
+        if raw_input('\nReally want to quit? (y/n)').lower().startswith('y'):
+            print('Quit now, byebye!')
+            sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(1)
+
+    signal.signal(signal.SIGINT, exit_gracefully)
+    return None
+
 def main():
+    sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, exit_gracefully)
+
     parser = argparse.ArgumentParser("Bookish-Tagger")
     parser.add_argument('-c', action='store', dest='dataType', required=True, type=int, help='Store the type of Taobao data')
     parser.add_argument('-i', action='store', dest='interval', required=True, type=int, help='Store the interval value')
