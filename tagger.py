@@ -127,6 +127,58 @@ def process(dataType):
 
     return None
 
+def processOne(dataType, srcid):
+    db = DATABASES['default']
+    con = MysqlClient(db['HOST'], db['USER'], db['PASSWORD'], db['NAME'], db['PORT'])
+    if not con.connect():
+        print('MySQL connection error...')
+        return None
+
+    ''' Node attributes '''
+    nodeAttributes = {}
+    query_rows = con.query('SELECT `cid`, `pid`, `typename` FROM `tb_category` WHERE `isattribute` = 1')
+    for cate in con.fetchAll():
+        nodeAttributes[str(cate[0])] = []
+        con.query('SELECT `cid`, `pid`, `typename` FROM `tb_category` WHERE `isattribute` = 2 AND `pid` = %s',
+            [cate[0]])
+        for attr in con.fetchAll():
+            attr_dic = {}
+            attr_dic['name'] = attr[2]
+            attr_dic['values'] = []
+            con.query('SELECT `cid`, `pid`, `typename` FROM `tb_category` WHERE `isattribute` = 3 AND `pid` = %s',
+                [attr[0]])
+            for val in con.fetchAll():
+                attr_dic['values'].append(val[2])
+            nodeAttributes[str(cate[0])].append(attr_dic)
+
+    print(json.dumps(nodeAttributes, encoding='UTF-8', ensure_ascii=False, 
+        sort_keys=True, 
+        indent=4, 
+        separators=(',', ': ')))
+
+    ''' synonyms '''
+    synonyms = {}
+
+    query_rows = con.query('SELECT `srcid`, `title`, `srclink`, `desp`, `createtime` FROM `tb_goods_info` '
+        'WHERE `cid` = %s AND `srcid` = %s',
+        [dataType, srcid])
+
+    if query_rows <> 1:
+        print('DataType (%s) srcid (%s) query %s rows...', [dataType, query_rows])
+
+    for data in con.fetchAll():
+        tags = tag(dataType, data[3], nodeAttributes, synonyms)
+
+        affected_rows = con.query('UPDATE `tb_goods_info` SET `attrs` = %s, `updatetime` = now() WHERE `srcid` = %s',
+            [json.dumps(tags, encoding='UTF-8', ensure_ascii=False), data[0]])
+        if affected_rows <> 1:
+            print('srcid (%s) update faild...' % srcid)
+        else:
+            print('srcid (%s) process successful...' % srcid)
+
+    con.commit();
+    return None
+
 def exit_gracefully(signum, frame):
     try:
         if raw_input('\nReally want to quit? (y/n)').lower().startswith('y'):
@@ -146,6 +198,7 @@ def main():
     parser.add_argument('-c', action='store', dest='dataType', required=True, type=int, help='Store the type of Taobao data')
     parser.add_argument('-i', action='store', dest='interval', required=True, type=int, help='Store the interval value')
     parser.add_argument('-t', action='store', dest='startTime', help='Store the processing starting time')
+    parser.add_argument('--srcid', action='store', dest='srcid', help='Store the specified srcid')
     parser.add_argument('--verbose', action='store_true', dest='verboseMode', help='Verbose mode')
     parser.add_argument('--version', action='version', version='%(prog)s 1.0')
     args = parser.parse_args()
@@ -157,7 +210,9 @@ def main():
     if args.verboseMode:
         settings.DEBUG = True
 
-    if args.dataType:
+    if args.srcid and args.dataType:
+        processOne(args.dataType, args.srcid)
+    elif args.dataType:
         process(args.dataType)
     return None
 
