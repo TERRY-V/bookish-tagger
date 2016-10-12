@@ -31,14 +31,14 @@ def saveCacheTime(startTime):
 
 def tag(id, desp, nodeAttributes, synonymsDic):
     tags = {}
-    despDict = json.loads(desp)
+    despDict = json.loads(string.lower(desp))
 
     attrs = nodeAttributes[str(id)]
     for attr in attrs:
         attr_n = attr['name']
         tags[attr_n] = []
 
-        attr_t = despDict.get(attr_n)
+        attr_t = despDict.get(string.lower(attr_n))
         if attr_t is None:
             continue
 
@@ -99,7 +99,7 @@ def process(dataType):
 
         while True:
             query_rows = con.query('SELECT `srcid`, `title`, `srclink`, `desp`, `createtime` '
-                'FROM `tb_goods_info` '
+                'FROM `tb_train_goods_info` '
                 'WHERE `cid` = %s AND `createtime` >= %s AND `createtime` < %s '
                 'limit %s, %s',
                 [dataType, last_time, now_time, start, step])
@@ -110,7 +110,7 @@ def process(dataType):
             for data in con.fetchAll():
                 tags = tag(dataType, data[3], nodeAttributes, synonyms)
 
-                affected_rows = con.query('UPDATE `tb_goods_info` SET `attrs` = %s, `updatetime` = now() WHERE `srcid` = %s',
+                affected_rows = con.query('UPDATE `tb_train_goods_info` SET `attrs` = %s, `updatetime` = now() WHERE `srcid` = %s',
                     [json.dumps(tags, encoding='UTF-8', ensure_ascii=False), data[0]])
                 if affected_rows <> 1:
                     print('srcid (%s) update faild...', [srcid])
